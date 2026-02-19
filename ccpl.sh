@@ -12,6 +12,8 @@ NC='\033[0m'
 
 UPDATE_LABELS=()
 UPDATE_CMDS=()
+FIX_LABELS=()
+FIX_CMDS=()
 
 # ╔══════════════════════════════════════════╗
 # ║            Rotating Debug Log            ║
@@ -272,6 +274,8 @@ if [ -n "$_ccpl_win_user" ] && [ -f "/mnt/c/Users/${_ccpl_win_user}/.wslconfig" 
     pass_check ".wslconfig exists"
 else
     warn_check ".wslconfig missing — WSL defaults to 50% RAM, no swap cap"
+    FIX_LABELS+=("Create default .wslconfig (8GB RAM, 4GB swap, systemd)")
+    FIX_CMDS+=("printf '[wsl2]\nmemory=8GB\nswap=4GB\n\n[boot]\nsystemd=true\n' > /mnt/c/Users/${_ccpl_win_user}/.wslconfig")
 fi
 
 # --- Systemd ---
@@ -280,12 +284,16 @@ if [ "$init_proc" = "systemd" ]; then
     pass_check "Systemd is running as init"
 else
     warn_check "Systemd not running (init: ${init_proc:-unknown}) — some services may not work"
+    FIX_LABELS+=("Enable systemd in wsl.conf")
+    FIX_CMDS+=("sudo bash -c 'printf \"\\n[boot]\\nsystemd=true\\n\" >> /etc/wsl.conf' && echo 'Restart WSL to apply: wsl --shutdown'")
 fi
 
 # --- APT Upgradeable ---
 apt_count=$(apt list --upgradeable 2>/dev/null | grep -c 'upgradeable')
 if [ "$apt_count" -gt 0 ] 2>/dev/null; then
-    warn_check "${apt_count} APT package(s) upgradeable — run ${DIM}sudo apt upgrade${NC}"
+    warn_check "${apt_count} APT package(s) upgradeable"
+    FIX_LABELS+=("Upgrade ${apt_count} APT package(s)")
+    FIX_CMDS+=("sudo apt-get upgrade -y")
 else
     pass_check "APT packages up to date"
 fi
@@ -311,13 +319,17 @@ if grep -qE '^\s*appendWindowsPath\s*=\s*false' /etc/wsl.conf 2>/dev/null; then
     pass_check "appendWindowsPath disabled in wsl.conf"
 else
     warn_check "appendWindowsPath not disabled — Windows PATH leaks into WSL"
+    FIX_LABELS+=("Disable appendWindowsPath in wsl.conf")
+    FIX_CMDS+=("sudo bash -c 'printf \"\\n[interop]\\nappendWindowsPath=false\\n\" >> /etc/wsl.conf' && echo 'Restart WSL to apply: wsl --shutdown'")
 fi
 
 # --- SSH Keys ---
 if ls ~/.ssh/id_* &>/dev/null; then
     pass_check "SSH keys found"
 else
-    warn_check "No SSH keys found — run ${DIM}ssh-keygen${NC}"
+    warn_check "No SSH keys found"
+    FIX_LABELS+=("Generate SSH key (ed25519)")
+    FIX_CMDS+=("ssh-keygen -t ed25519 -C \"$(whoami)@$(hostname)\" -N '' -f ~/.ssh/id_ed25519")
 fi
 
 # --- GitHub CLI ---
@@ -328,10 +340,14 @@ if command -v gh &>/dev/null; then
     if gh auth status &>/dev/null; then
         pass_check "GitHub CLI authenticated"
     else
-        warn_check "GitHub CLI not authenticated — run ${DIM}gh auth login${NC}"
+        warn_check "GitHub CLI not authenticated"
+        FIX_LABELS+=("Authenticate GitHub CLI")
+        FIX_CMDS+=("gh auth login")
     fi
 else
-    warn_check "GitHub CLI not installed — see ${DIM}https://cli.github.com${NC}"
+    warn_check "GitHub CLI not installed"
+    FIX_LABELS+=("Install GitHub CLI")
+    FIX_CMDS+=("curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && echo 'deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main' | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && sudo apt-get update -y && sudo apt-get install -y gh")
 fi
 
 echo ""
@@ -349,14 +365,18 @@ if [ -n "$ANTHROPIC_API_KEY" ]; then
 elif [ -s "$HOME/.claude/.credentials.json" ]; then
     pass_check "Claude credentials found"
 else
-    warn_check "No Claude auth — run ${DIM}claude${NC} to log in or set ANTHROPIC_API_KEY"
+    warn_check "No Claude auth — set ANTHROPIC_API_KEY or log in"
+    FIX_LABELS+=("Log in to Claude Code")
+    FIX_CMDS+=("claude")
 fi
 
 # --- Settings ---
 if [ -f "$HOME/.claude/settings.json" ]; then
     pass_check "Claude settings.json exists"
 else
-    warn_check "No Claude settings.json — run ${DIM}claude${NC} to initialize"
+    warn_check "No Claude settings.json"
+    FIX_LABELS+=("Initialize Claude Code settings")
+    FIX_CMDS+=("claude")
 fi
 
 # --- MCP Servers ---
@@ -380,7 +400,9 @@ fi
 if [ -f "$HOME/CLAUDE.md" ]; then
     pass_check "~/CLAUDE.md found"
 else
-    warn_check "No ~/CLAUDE.md — consider creating one for project context"
+    warn_check "No ~/CLAUDE.md"
+    FIX_LABELS+=("Create ~/CLAUDE.md template")
+    FIX_CMDS+=("printf '# CLAUDE.md\n\nThis file provides guidance to Claude Code when working in this home directory.\n\n## Preferences\n\n- \n' > ~/CLAUDE.md")
 fi
 
 echo ""
@@ -446,6 +468,51 @@ else
         done
     elif [ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -le "$count" ] 2>/dev/null; then
         run_update "$((choice-1))"
+    else
+        echo -e "  ${YELLOW}Invalid choice — skipped${NC}"
+    fi
+fi
+
+echo ""
+
+# ╔══════════════════════════════════════════╗
+# ║        Section 7: Recommended Fixes      ║
+# ╚══════════════════════════════════════════╝
+
+echo -e "${CYAN}${BOLD}  ── Recommended Fixes ──────────${NC}"
+echo ""
+
+if [ ${#FIX_LABELS[@]} -eq 0 ]; then
+    echo -e "  ${GREEN}✓${NC} No issues to fix"
+else
+    fix_count=${#FIX_LABELS[@]}
+    for ((i=0; i<fix_count; i++)); do
+        echo -e "  ${BOLD}$((i+1)))${NC} ${FIX_LABELS[$i]}"
+    done
+    echo -e "  ${BOLD}$((fix_count+1)))${NC} Fix all"
+    echo -e "  ${BOLD}0)${NC} Skip"
+    echo ""
+    echo -ne "  ${BOLD}Select [0-$((fix_count+1))]:${NC} "
+    read -r fix_choice
+
+    run_fix() {
+        local idx=$1
+        echo -ne "  ${FIX_LABELS[$idx]} ... "
+        if eval "${FIX_CMDS[$idx]}" >/dev/null 2>&1; then
+            echo -e "${GREEN}done${NC}"
+        else
+            echo -e "${RED}failed${NC}"
+        fi
+    }
+
+    if [ "$fix_choice" = "0" ] || [ -z "$fix_choice" ]; then
+        echo -e "  ${DIM}Skipped${NC}"
+    elif [ "$fix_choice" = "$((fix_count+1))" ]; then
+        for ((i=0; i<fix_count; i++)); do
+            run_fix "$i"
+        done
+    elif [ "$fix_choice" -ge 1 ] 2>/dev/null && [ "$fix_choice" -le "$fix_count" ] 2>/dev/null; then
+        run_fix "$((fix_choice-1))"
     else
         echo -e "  ${YELLOW}Invalid choice — skipped${NC}"
     fi
