@@ -453,11 +453,11 @@ else
 
     run_update() {
         local idx=$1
-        echo -ne "  ${UPDATE_LABELS[$idx]} ... "
-        if eval "${UPDATE_CMDS[$idx]}" >/dev/null 2>&1; then
-            echo -e "${GREEN}done${NC}"
+        echo -e "  ${UPDATE_LABELS[$idx]} ..."
+        if eval "${UPDATE_CMDS[$idx]}"; then
+            echo -e "  ${GREEN}done${NC}"
         else
-            echo -e "${RED}failed${NC}"
+            echo -e "  ${RED}failed${NC}"
         fi
     }
 
@@ -498,11 +498,11 @@ else
 
     run_fix() {
         local idx=$1
-        echo -ne "  ${FIX_LABELS[$idx]} ... "
-        if eval "${FIX_CMDS[$idx]}" >/dev/null 2>&1; then
-            echo -e "${GREEN}done${NC}"
+        echo -e "  ${FIX_LABELS[$idx]} ..."
+        if eval "${FIX_CMDS[$idx]}"; then
+            echo -e "  ${GREEN}done${NC}"
         else
-            echo -e "${RED}failed${NC}"
+            echo -e "  ${RED}failed${NC}"
         fi
     }
 
