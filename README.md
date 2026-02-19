@@ -10,7 +10,7 @@
   Claude Code Project Loader v2.0
 ```
 
-A shell startup script for WSL that checks versions, environment health, and keeps your Claude Code development stack up to date — every time you open a terminal.
+A single command for WSL that checks versions, audits your environment, and keeps your Claude Code development stack up to date.
 
 ## Features
 
@@ -36,6 +36,8 @@ git clone https://github.com/freshdex/ccpl.git
 cd ccpl
 bash install.sh
 ```
+
+Then run `ccpl` whenever you want to check your environment.
 
 ## Uninstall
 

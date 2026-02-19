@@ -4,14 +4,11 @@ set -e
 
 BOLD='\033[1m'
 GREEN='\033[32m'
-YELLOW='\033[33m'
 RED='\033[31m'
 NC='\033[0m'
 
 INSTALL_DIR="$HOME/.local/bin"
-SCRIPT_NAME="ccpl.sh"
-SOURCE_LINE="source \"$INSTALL_DIR/$SCRIPT_NAME\""
-MARKER="# CCPL — Claude Code Project Loader"
+BIN_NAME="ccpl"
 
 echo ""
 echo -e "${BOLD}CCPL Installer${NC}"
@@ -45,33 +42,26 @@ mkdir -p "$INSTALL_DIR"
 
 # If running from a local clone, copy the adjacent ccpl.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/$SCRIPT_NAME" ]; then
-    cp "$SCRIPT_DIR/$SCRIPT_NAME" "$INSTALL_DIR/$SCRIPT_NAME"
+if [ -f "$SCRIPT_DIR/ccpl.sh" ]; then
+    cp "$SCRIPT_DIR/ccpl.sh" "$INSTALL_DIR/$BIN_NAME"
 else
     curl -fsSL "https://raw.githubusercontent.com/freshdex/ccpl/main/ccpl.sh" \
-        -o "$INSTALL_DIR/$SCRIPT_NAME"
+        -o "$INSTALL_DIR/$BIN_NAME"
 fi
 
-chmod +x "$INSTALL_DIR/$SCRIPT_NAME"
-echo -e "${GREEN}✓${NC} Installed to $INSTALL_DIR/$SCRIPT_NAME"
+chmod +x "$INSTALL_DIR/$BIN_NAME"
+echo -e "${GREEN}✓${NC} Installed to $INSTALL_DIR/$BIN_NAME"
 
-# --- Add to shell rc files ---
-add_to_rc() {
-    local rc="$1"
-    if [ -f "$rc" ]; then
-        if ! grep -qF "$MARKER" "$rc" 2>/dev/null; then
-            printf '\n%s\n%s\n' "$MARKER" "$SOURCE_LINE" >> "$rc"
-            echo -e "${GREEN}✓${NC} Added to $(basename "$rc")"
-        else
-            echo -e "${YELLOW}⚠${NC} Already in $(basename "$rc") — skipped"
-        fi
-    fi
-}
-
-add_to_rc "$HOME/.bashrc"
-add_to_rc "$HOME/.zshrc"
+# --- Check PATH ---
+if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
+    echo ""
+    echo -e "  ${BOLD}Note:${NC} $INSTALL_DIR is not in your PATH."
+    echo "  Add this to your ~/.bashrc or ~/.zshrc:"
+    echo ""
+    echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
+    echo ""
+fi
 
 echo ""
-echo -e "${GREEN}Done!${NC} Open a new terminal or run:"
-echo -e "  source $INSTALL_DIR/$SCRIPT_NAME"
+echo -e "${GREEN}Done!${NC} Run ${BOLD}ccpl${NC} to launch."
 echo ""
