@@ -12,6 +12,36 @@ NC='\033[0m'
 
 CLAUDE_NEEDS_UPDATE=false
 
+# ╔══════════════════════════════════════════╗
+# ║            Rotating Debug Log            ║
+# ╚══════════════════════════════════════════╝
+
+LOG_DIR="$HOME/.local/share/ccpl"
+LOG_FILE="$LOG_DIR/ccpl.log"
+LOG_MAX_SIZE=102400  # 100 KB
+LOG_KEEP=3           # number of rotated files to keep
+
+mkdir -p "$LOG_DIR"
+
+# Rotate logs if current file exceeds max size
+if [ -f "$LOG_FILE" ]; then
+    log_size=$(stat -c%s "$LOG_FILE" 2>/dev/null || stat -f%z "$LOG_FILE" 2>/dev/null || echo 0)
+    if [ "$log_size" -ge "$LOG_MAX_SIZE" ]; then
+        for ((i=LOG_KEEP-1; i>=1; i--)); do
+            [ -f "${LOG_FILE}.$i" ] && mv "${LOG_FILE}.$i" "${LOG_FILE}.$((i+1))"
+        done
+        mv "$LOG_FILE" "${LOG_FILE}.1"
+        # Prune oldest beyond keep count
+        rm -f "${LOG_FILE}.$((LOG_KEEP+1))"
+    fi
+fi
+
+# Tee all output to log (with ANSI codes stripped in the log copy)
+exec > >(tee >(sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE")) 2>&1
+
+# Run header
+echo "═══ CCPL run: $(date '+%Y-%m-%d %H:%M:%S') ═══"
+
 # Detect Windows username for cross-filesystem checks
 _ccpl_win_user=$(cmd.exe /C "echo %USERNAME%" 2>/dev/null | tr -d '\r\n')
 if [ -z "$_ccpl_win_user" ]; then
