@@ -10,7 +10,8 @@ CYAN='\033[36m'
 RED='\033[31m'
 NC='\033[0m'
 
-CLAUDE_NEEDS_UPDATE=false
+UPDATE_LABELS=()
+UPDATE_CMDS=()
 
 # ╔══════════════════════════════════════════╗
 # ║            Rotating Debug Log            ║
@@ -181,9 +182,9 @@ fi
 if [ -n "$claude_latest" ]; then
     echo -e "    Latest    : ${YELLOW}${claude_latest}${NC}"
     print_status "$claude_current" "$claude_latest"
-    version_compare "$claude_current" "$claude_latest"
     if [ $? -eq 2 ]; then
-        CLAUDE_NEEDS_UPDATE=true
+        UPDATE_LABELS+=("Claude Code ${claude_current} → ${claude_latest}")
+        UPDATE_CMDS+=("npm install -g @anthropic-ai/claude-code@latest")
     fi
 else
     echo -e "    ${DIM}Could not fetch latest${NC}"
@@ -228,6 +229,10 @@ fi
 if [ -n "$npm_latest" ]; then
     echo -e "    Latest    : ${YELLOW}${npm_latest}${NC}"
     print_status "$npm_current" "$npm_latest"
+    if [ $? -eq 2 ]; then
+        UPDATE_LABELS+=("npm ${npm_current} → ${npm_latest}")
+        UPDATE_CMDS+=("npm install -g npm@latest")
+    fi
 else
     echo -e "    ${DIM}Could not fetch latest${NC}"
 fi
@@ -254,6 +259,10 @@ fi
 if [ -n "$git_latest" ]; then
     echo -e "    Latest    : ${YELLOW}${git_latest}${NC}"
     print_status "$git_current" "$git_latest"
+    if [ $? -eq 2 ]; then
+        UPDATE_LABELS+=("Git ${git_current} → ${git_latest}")
+        UPDATE_CMDS+=("sudo apt-get install -y --only-upgrade git")
+    fi
 else
     echo -e "    ${DIM}Could not fetch latest${NC}"
 fi
@@ -280,6 +289,10 @@ fi
 if [ -n "$python_latest" ]; then
     echo -e "    Latest    : ${YELLOW}${python_latest}${NC}"
     print_status "$python_current" "$python_latest"
+    if [ $? -eq 2 ]; then
+        UPDATE_LABELS+=("Python ${python_current} → ${python_latest}")
+        UPDATE_CMDS+=("sudo apt-get install -y --only-upgrade python3")
+    fi
 else
     echo -e "    ${DIM}Could not fetch latest${NC}"
 fi
@@ -454,26 +467,40 @@ echo ""
 echo -e "${CYAN}${BOLD}  ── Package Updates ────────────${NC}"
 echo ""
 
-echo -ne "  npm update -g  ... "
-npm_out=$(sudo npm update -g 2>&1)
-if echo "$npm_out" | grep -q "changed"; then
-    echo -e "${GREEN}updated${NC}"
+if [ ${#UPDATE_LABELS[@]} -eq 0 ]; then
+    echo -e "  ${GREEN}✓${NC} Everything is up to date"
 else
-    echo -e "${GREEN}ok${NC}"
-fi
+    count=${#UPDATE_LABELS[@]}
+    for ((i=0; i<count; i++)); do
+        echo -e "  ${BOLD}$((i+1)))${NC} ${UPDATE_LABELS[$i]}"
+    done
+    echo -e "  ${BOLD}$((count+1)))${NC} Update all"
+    echo -e "  ${BOLD}0)${NC} Skip"
+    echo ""
+    echo -ne "  ${BOLD}Select [0-$((count+1))]:${NC} "
+    read -r choice
 
-if [ "$CLAUDE_NEEDS_UPDATE" = true ]; then
-    echo -ne "  claude update  ... "
-    local_out=$(yes 2>/dev/null | timeout 10 claude update 2>&1) || true
-    if echo "$local_out" | grep -qi "up to date"; then
-        echo -e "${GREEN}up to date${NC}"
-    elif echo "$local_out" | grep -qi "updated\|installed\|success"; then
-        echo -e "${GREEN}updated${NC}"
+    run_update() {
+        local idx=$1
+        echo -ne "  ${UPDATE_LABELS[$idx]} ... "
+        if eval "${UPDATE_CMDS[$idx]}" >/dev/null 2>&1; then
+            echo -e "${GREEN}done${NC}"
+        else
+            echo -e "${RED}failed${NC}"
+        fi
+    }
+
+    if [ "$choice" = "0" ] || [ -z "$choice" ]; then
+        echo -e "  ${DIM}Skipped${NC}"
+    elif [ "$choice" = "$((count+1))" ]; then
+        for ((i=0; i<count; i++)); do
+            run_update "$i"
+        done
+    elif [ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -le "$count" ] 2>/dev/null; then
+        run_update "$((choice-1))"
     else
-        echo -e "${YELLOW}skipped${NC}"
+        echo -e "  ${YELLOW}Invalid choice — skipped${NC}"
     fi
-else
-    echo -e "  claude update  ... ${GREEN}up to date${NC}"
 fi
 
 echo ""
