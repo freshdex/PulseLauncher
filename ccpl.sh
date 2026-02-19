@@ -228,7 +228,11 @@ if [ $? -eq 2 ]; then
 fi
 
 # --- Python ---
-python_current=$(python3 --version 2>/dev/null | awk '{print $2}')
+# Check highest installed python3.x version (includes side-by-side installs)
+python_current=$(ls /usr/bin/python3.[0-9]* 2>/dev/null | sed 's|.*/python||' | sort -t. -k1,1n -k2,2n | tail -1)
+if [ -z "$python_current" ]; then
+    python_current=$(python3 --version 2>/dev/null | awk '{print $2}')
+fi
 python_latest=$(curl -sf "https://api.github.com/repos/python/cpython/tags?per_page=50" | \
     python3 -c "
 import sys, json, re
@@ -244,7 +248,7 @@ print_version_line "Python" "$python_current" "$python_latest"
 if [ $? -eq 2 ]; then
     UPDATE_LABELS+=("Python ${python_current} → ${python_latest}")
     py_minor=$(echo "$python_latest" | cut -d. -f1-2)
-    UPDATE_CMDS+=("sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt-get update -y && sudo apt-get install -y python${py_minor} && sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${py_minor} 2")
+    UPDATE_CMDS+=("sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt-get update -y && sudo apt-get install -y python${py_minor}")
 fi
 
 echo ""
