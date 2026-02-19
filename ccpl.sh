@@ -347,7 +347,8 @@ if command -v gh &>/dev/null; then
 else
     warn_check "GitHub CLI not installed"
     FIX_LABELS+=("Install GitHub CLI")
-    FIX_CMDS+=("curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && echo 'deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main' | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && sudo apt-get update -y && sudo apt-get install -y gh")
+    _gh_arch=$(dpkg --print-architecture 2>/dev/null || echo amd64)
+    FIX_CMDS+=("sudo mkdir -p -m 755 /etc/apt/keyrings && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && echo 'deb [arch=${_gh_arch} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main' | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null && sudo apt-get update -y && sudo apt-get install -y gh")
 fi
 
 echo ""
