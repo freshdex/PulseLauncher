@@ -54,12 +54,10 @@ echo -e "${GREEN}✓${NC} Installed to $INSTALL_DIR/$BIN_NAME"
 
 # --- Check PATH ---
 if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
-    echo ""
-    echo -e "  ${BOLD}Note:${NC} $INSTALL_DIR is not in your PATH."
-    echo "  Add this to your ~/.bashrc or ~/.zshrc:"
-    echo ""
-    echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
-    echo ""
+    if ! grep -qF '.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+        printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.bashrc"
+    fi
+    echo -e "${GREEN}✓${NC} Added $INSTALL_DIR to PATH in ~/.bashrc"
 fi
 
 echo ""

@@ -74,10 +74,10 @@ function Invoke-PlHealthChecks {
         return
     }
 
-    # Try pulselauncher from WSL PATH
-    $found = (& wsl -- which pulselauncher 2>$null) -replace '\x00', ''
+    # Try pulselauncher from WSL PATH (login shell so ~/.profile is sourced)
+    $found = (& wsl -- bash --login -c 'which pulselauncher' 2>$null) -replace '\x00', ''
     if ($found -and $found.Trim() -ne '') {
-        & wsl -- pulselauncher
+        & wsl -- bash --login -c pulselauncher
         return
     }
 
